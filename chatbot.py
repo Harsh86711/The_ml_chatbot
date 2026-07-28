@@ -12,8 +12,8 @@ from nltk.stem import PorterStemmer
 
 # Download NLTK resources
 nltk.download('punkt', quiet=True)
+nltk.download('punkt_tab', quiet=True)
 nltk.download('stopwords', quiet=True)
-
 # Page Configuration
 st.set_page_config(
     page_title="ML Chatbot",
