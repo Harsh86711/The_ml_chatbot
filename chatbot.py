@@ -3,250 +3,136 @@ import pandas as pd
 import pickle
 import nltk
 import string
-import os  
+import os
+import random
 
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 
-# # Download NLTK Data
-nltk.download('punkt')
-nltk.download('stopwords')
+# Download NLTK resources
+nltk.download('punkt', quiet=True)
+nltk.download('stopwords', quiet=True)
 
-# # Page Configuration
+# Page Configuration
 st.set_page_config(
     page_title="ML Chatbot",
-    page_icon="🤖",
-    layout="centered"
+    page_icon="💀",
+    layout="wide"
 )
 
-# # Load Model Files
+# Base Directory Setup
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# NLTK Preprocessing Setup
+stemmer = PorterStemmer()
+stop_words = set(stopwords.words('english'))
+
+def preprocess_text(text):
+    text = text.lower()
+    tokens = word_tokenize(text)
+    clean_tokens = [
+        stemmer.stem(word) 
+        for word in tokens 
+        if word not in string.punctuation and word not in stop_words
+    ]
+    return " ".join(clean_tokens)
+
+# Load Model Files
 @st.cache_resource
 def load_model():
-    model_path = os.path.join(BASE_DIR, "chatbot_model.pkl")
+    model_path = os.path.join(BASE_DIR, "Chatbot_model.pkl")
     vectorizer_path = os.path.join(BASE_DIR, "vectorizer.pkl")
     
-    model = pickle.load(open(model_path, "rb"))
-    vectorizer = pickle.load(open(vectorizer_path, "rb"))
-    
+    with open(model_path, "rb") as f:
+        model = pickle.load(f)
+    with open(vectorizer_path, "rb") as f:
+        vectorizer = pickle.load(f)
+        
     return model, vectorizer
 
-
-
-model, vectorizer = load_model()
-
-# Load Dataset
-
+# Load Dataset for Responses
 @st.cache_data
 def load_data():
-    csv_path = os.path.join(BASE_DIR,"chatbot.csv")
+    csv_path = os.path.join(BASE_DIR, "chatbot.csv")
+    if os.path.exists(csv_path):
+        return pd.read_csv(csv_path)
+    return None
 
-    return df
+try:
+    model, vectorizer = load_model()
+    df = load_data()
+except Exception as e:
+    st.error(f"Error loading model or files: {e}")
+    st.stop()
 
+# Custom Responses Dictionary (Fallback)
+RESPONSES = {
+    "greeting": ["Hello! How can I help you?", "Hi there! How can I assist you today?"],
+    "goodbye": ["Goodbye! Have a nice day!", "See you later!"],
+    "thanks": ["You're welcome!", "Happy to help!"],
+    "about": ["I am an ML Chatbot trained to answer queries about Python, AI, ML, Deep Learning, and Data Science."]
+}
 
+def get_response(tag):
+    # First check CSV if available
+    if df is not None:
+        cols = [c.lower() for c in df.columns]
+        if 'tag' in cols and 'response' in cols:
+            tag_col = df.columns[cols.index('tag')]
+            resp_col = df.columns[cols.index('response')]
+            matching = df[df[tag_col] == tag][resp_col].values
+            if len(matching) > 0:
+                return random.choice(matching)
+    
+    # Fallback to dictionary
+    if tag in RESPONSES:
+        return random.choice(RESPONSES[tag])
+    
+    # Default fallback message seen in your screenshot
+    return "Sorry, I am not sure about that. Please ask something related to AI, ML, Python, or Data Science."
 
-df = load_data()
+# ----------------- SIDEBAR -----------------
+with st.sidebar:
+    st.title("About Chatbot")
+    st.write("This chatbot uses:")
+    st.markdown("- 🟩 **NLP Text Processing**")
+    st.markdown("- 🟩 **TF-IDF Vectorization**")
+    st.markdown("- 🟩 **Logistic Regression**")
+    st.markdown("- 🟩 **Streamlit**")
+    
+    st.write("")
+    if st.button("Clear Chat"):
+        st.session_state.messages = []
+        st.rerun()
 
-# Text Preprocessing
+# ----------------- MAIN UI -----------------
+st.markdown("<h1 style='text-align: center;'>💀 Machine Learning Chatbot</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: gray;'>Ask questions about Python, AI, Machine Learning, Deep Learning and Data Science.</p>", unsafe_allow_html=True)
 
-stemmer = PorterStemmer()
-
-stop_words = set(
-    stopwords.words("english")
-)
-
-
-def clean_text(text):
-
-    # lowercase
-    text = text.lower()
-
-
-    # remove punctuation
-    text = text.translate(
-        str.maketrans(
-            "",
-            "",
-            string.punctuation
-        )
-    )
-
-
-    # tokenize
-    words = word_tokenize(text)
-
-
-    # remove stop words + stemming
-    words = [
-        stemmer.stem(word)
-        for word in words
-        if word not in stop_words
-    ]
-
-
-    return " ".join(words)
-
-
-# Chatbot Prediction Function
-
-def chatbot_response(user_text):
-
-
-    cleaned = clean_text(user_text)
-
-
-    # Convert text into numbers
-
-    vector = vectorizer.transform(
-        [cleaned]
-    )
-
-
-    # Prediction
-
-    intent = model.predict(vector)[0]
-
-
-    # Confidence score
-
-    probability = model.predict_proba(vector)
-
-    confidence = probability.max()
-
-
-
-    # Low confidence handling
-
-    if confidence < 0.40:
-
-        return (
-            "Sorry, I am not sure about that. "
-            "Please ask something related to AI, ML, Python, or Data Science."
-        )
-
-
-
-    # Get response from CSV
-
-    response = df[
-        df["intent"] == intent
-    ]["response"].iloc[0]
-
-
-    return response
-
-
-
-# Session Chat History
-
+# Initialize Session State
 if "messages" not in st.session_state:
-
     st.session_state.messages = []
 
-
-
-# User Interface
-
-
-st.title("🤖 Machine Learning Chatbot")
-
-st.write(
-    "Ask questions about Python, AI, Machine Learning, Deep Learning and Data Science."
-)
-
-
-
-# Display old messages
-
+# Display Chat History
 for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-    with st.chat_message(
-        message["role"]
-    ):
-
-        st.write(
-            message["content"]
-        )
-
-
-
-# User Input
-
-user_input = st.chat_input(
-    "Type your message here..."
-)
-
-
-
-if user_input:
-
-
-    # Display user message
-
-    st.session_state.messages.append(
-        {
-            "role":"user",
-            "content":user_input
-        }
-    )
-
-
+# Chat Input
+if user_input := st.chat_input("Type your message here..."):
+    # Render user input
+    st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
+        st.markdown(user_input)
 
-        st.write(user_input)
-
-
-
-    # Get bot response
-
-    answer = chatbot_response(
-        user_input
-    )
-
-
-    # Display bot message
-
-    st.session_state.messages.append(
-        {
-            "role":"assistant",
-            "content":answer
-        }
-    )
-
-
+    # Generate & Render bot response
     with st.chat_message("assistant"):
+        processed = preprocess_text(user_input)
+        vectorized = vectorizer.transform([processed])
+        predicted_tag = model.predict(vectorized)[0]
+        
+        reply = get_response(predicted_tag)
+        st.markdown(reply)
 
-        st.write(answer)
-
-
-# Sidebar
-
-with st.sidebar:
-
-
-    st.header("About Chatbot")
-
-
-    st.write(
-        """
-        This chatbot uses:
-
-        ✅ NLP Text Processing
-
-        ✅ TF-IDF Vectorization
-
-        ✅ Logistic Regression
-
-        ✅ Streamlit
-
-        """
-    )
-
-
-    if st.button("Clear Chat"):
-
-        st.session_state.messages = []
-
-        st.rerun()
+    st.session_state.messages.append({"role": "assistant", "content": reply})
