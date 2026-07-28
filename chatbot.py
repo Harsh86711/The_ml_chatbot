@@ -3,36 +3,34 @@ import pandas as pd
 import pickle
 import nltk
 import string
+import os  
 
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 
-# Download NLTK Data
+# # Download NLTK Data
 nltk.download('punkt')
 nltk.download('stopwords')
 
-# Page Configuration
-
+# # Page Configuration
 st.set_page_config(
     page_title="ML Chatbot",
     page_icon="🤖",
     layout="centered"
 )
 
-# Load Model Files
+# # Load Model Files
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 @st.cache_resource
 def load_model():
-
-    model = pickle.load(
-        open("chatbot_model.pkl", "rb")
-    )
-
-    vectorizer = pickle.load(
-        open("vectorizer.pkl", "rb")
-    )
-
+    model_path = os.path.join(BASE_DIR, "chatbot_model.pkl")
+    vectorizer_path = os.path.join(BASE_DIR, "vectorizer.pkl")
+    
+    model = pickle.load(open(model_path, "rb"))
+    vectorizer = pickle.load(open(vectorizer_path, "rb"))
+    
     return model, vectorizer
 
 
@@ -43,8 +41,7 @@ model, vectorizer = load_model()
 
 @st.cache_data
 def load_data():
-
-    df = pd.read_csv("chatbot.csv")
+    csv_path = os.path.join(BASE_DIR,"chatbot.csv")
 
     return df
 
